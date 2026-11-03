@@ -1,6 +1,6 @@
 package: community.lazycat.app.fossbilling
 name: FOSSBilling
-version: 0.0.0
+version: 0.8.9
 description: "Billing and client management: invoices, orders, products and support tickets for small hosting businesses."
 min_os_version: "1.5.0"
 homepage: https://fossbilling.org/
