@@ -1,0 +1,80 @@
+application:
+  subdomain: fossbilling
+  multi_instance: false
+  # FOSSBilling ships its own admin and client accounts with a full installer,
+  # so it is exposed directly instead of sitting behind the platform login gate.
+  public_path:
+    - /
+  upstreams:
+    - location: /package-licenses/
+      backend: file:///lzcapp/pkg/content/licenses/
+    - location: /
+      backend: http://fossbilling:80/
+
+services:
+  # Docker creates a *directory* when a bind source file is missing, which would
+  # turn src/config.php into a directory and break the installer. Create the
+  # empty file first so the bind mounts as a file, exactly as upstream expects.
+  config-init:
+    image: docker.1ms.run/library/busybox:1.36
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |-
+        set -eu
+        mkdir -p /target
+        if [ -d /target/config.php ]; then
+          echo "config-init: removing stray directory at config.php" >&2
+          rmdir /target/config.php 2>/dev/null || true
+        fi
+        if [ ! -e /target/config.php ]; then
+          : > /target/config.php
+          echo "config-init: created empty config.php"
+        else
+          echo "config-init: config.php already present, keeping it"
+        fi
+    binds:
+      - /lzcapp/var:/target
+
+  fossbilling:
+    # upstream: fossbilling/fossbilling:0.8.9
+    image: docker.1ms.run/fossbilling/fossbilling:0.8.9
+    depends_on:
+      - config-init
+    environment:
+      - TZ=Asia/Shanghai
+    binds:
+      # Only the writable paths are mounted. Upstream's .gitignore names exactly
+      # these: src/config.php (written by the installer), src/data (SQLite db,
+      # cache, logs, uploads) and the top-level cache dir. Mounting all of
+      # /var/www/html would shadow the application code shipped in the image.
+      - /lzcapp/var/config.php:/var/www/html/src/config.php
+      - /lzcapp/var/data:/var/www/html/src/data
+      - /lzcapp/var/cache:/var/www/html/cache
+
+usage: |
+  FOSSBilling 是给小型主机商、独立开发者用的计费与客户管理系统。产品目录、订单、发票、支付、工单都在一个后台里，客户有自己的自助面板。
+
+  使用方法：
+  1. 打开应用，第一次会进入**安装向导**。
+  2. 数据库选 SQLite（本包就是按单容器内置数据库配的），
+     然后填管理员姓名、邮箱和密码——**这个账号就是你的后台管理员，由你自己设置**。
+  3. 装完进 /admin 登录后台，先建产品和价格，再配置支付方式。
+  4. 客户端访问首页可以注册、下单、看发票、提工单。
+
+  数据与安全：
+  - 持久化的只有三处：src/config.php（安装时生成）、src/data（SQLite 库、
+    缓存、日志、上传文件）、cache 目录，都挂在 /lzcapp/var 下。
+    卸载会一并删除，请定期备份。
+  - **没有内置默认口令**：管理员账号密码在安装向导里由你自己填。
+    上游代码里有个 InstallSeeder 用于命令行安装，本包走的是网页向导，不会触发它。
+  - 应用直接对外开放，由 FOSSBilling 自己的登录页鉴权（后台 /admin、客户区各自独立）：
+    自带账号体系的服务再套一层平台鉴权会造成重复登录，所以用 public_path。
+
+  说明：
+  - 单容器 + 内置 SQLite（Apache + PHP + cron），不需要额外数据库。
+    业务量上来后建议自行换 MySQL/MariaDB。
+  - 支付网关需要你自己的商户密钥（支付宝、Stripe、PayPal 等），本包不预置任何凭据。
+  - 邮件默认未配置，发票通知与密码找回需要你先在后台填 SMTP。
+  - 未做真机验证：安装向导、后台登录、建产品下单以及重启后数据留存
+    均未在设备上实测。

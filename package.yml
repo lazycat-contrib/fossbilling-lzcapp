@@ -1,0 +1,18 @@
+package: community.lazycat.app.fossbilling
+name: FOSSBilling
+version: 0.0.0
+description: "Billing and client management: invoices, orders, products and support tickets for small hosting businesses."
+min_os_version: "1.5.0"
+homepage: https://fossbilling.org/
+author: FOSSBilling
+license: Apache-2.0
+permissions:
+  required:
+    - net.internet
+locales:
+  zh:
+    name: FOSSBilling
+    description: "计费与客户管理系统：发票、订单、产品与工单，适合小型主机商。"
+  en:
+    name: FOSSBilling
+    description: "Billing and client management: invoices, orders, products and support tickets for small hosting businesses."
